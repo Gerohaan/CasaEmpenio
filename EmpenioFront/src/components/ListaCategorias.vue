@@ -1,0 +1,193 @@
+<template>
+    <div>
+
+    <q-table
+      title="Categorias"
+      :data="data"
+      :columns="columns"
+      row-key="id"
+      :filter="filter"
+      no-data-label="No se han encontrado categorias" 
+      :dense="$q.screen.lt.md"
+    >
+    <template v-slot:top-left>
+      <q-icon size="2em" name="style"/>
+    </template>
+      <template v-slot:top-right>
+        <q-input borderless dense debounce="300" v-model="filter" placeholder="Buscar">
+          <template v-slot:append>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+      </template>
+      <template v-slot:no-data="{ icon, filter }">
+        <div class="full-width row flex-center text-accent q-gutter-sm">
+          <q-icon size="2em" name="sentiment_dissatisfied" />
+          <span>
+            No hay coincidencias con "{{ filter }}"
+          </span>
+          <q-icon size="2em" :name="filter ? 'filter_b_and_w' : icon" />
+        </div>
+      </template>
+
+      <template v-slot:header="props">
+        <q-tr :props="props">
+          <q-th auto-width />
+          <q-th
+            v-for="col in props.cols"
+            :key="col.name"
+            :props="props"
+          >
+            {{ col.label }}
+          </q-th>
+        </q-tr>
+      </template>
+
+      <template v-slot:body="props">
+        <q-tr :props="props">
+          <q-td auto-width>
+            <q-btn size="sm" color="cyan" round dense @click="props.expand = !props.expand" :icon="props.expand ? 'remove' : 'add'" />
+          </q-td>
+          <q-td
+            v-for="col in props.cols"
+            :key="col.name"
+            :props="props"
+          >
+            {{ col.value }}
+          </q-td>
+        </q-tr>
+        <q-tr v-show="props.expand" :props="props">
+          <q-td colspan="100%">
+            <div class="q-pa-md q-gutter-sm">
+              <!--<q-btn push color="white" @click="showClient(props.row.id)" icon="search" text-color="indigo" label="Ver" />-->
+              <q-btn push color="white" @click="AbrirModalModificarCategory(props.row.id)" icon="drive_file_rename_outline" text-color="indigo" label="Modificar" />
+              <q-btn push color="white" @click="deleteCategory(props.row.id)" icon="delete_sweep" text-color="indigo" label="Eliminar" />
+            </div>
+          </q-td>
+        </q-tr>
+      </template>
+
+    </q-table>
+    <q-page-sticky position="bottom-right" :offset="[18, 18]">
+        <q-btn fab icon="add" color="indigo" @click="AbrirModalCrearCategory()" />
+    </q-page-sticky>
+
+     <CrearCategoria v-on:listarCategorias="getCategorias"></CrearCategoria>
+     <ModificarCategoria v-on:listarCategorias="getCategorias" :categorySelect="selectCategory"></ModificarCategoria>
+    
+    </div>
+</template>
+<script>
+import { mapState, mapMutations, mapActions, mapGetters } from 'vuex'
+import axios from 'axios'
+import CrearCategoria from 'src/components/CrearCategoria'
+import ModificarCategoria from 'src/components/ModificarCategoria'
+
+export default {
+    name: 'ListaCategorias',
+    components: { 
+      CrearCategoria,
+      ModificarCategoria 
+      },
+  data () {
+    return {
+      filter: '',
+      columns: [
+        {
+          name: 'ID',
+          required: true,
+          label: 'ID',
+          align: 'left',
+          field: row => row.id,
+          format: val => `${val}`,
+          sortable: true
+        },
+        { name: 'nombre', align: 'center', label: 'Nombre', field: 'nombre'},
+        { name: 'descripcion', align: 'center', label: 'Descripción', field: 'descripcion'},
+        { name: 'status', label: 'Status', field: 'status' }
+      ],
+      data: [],
+      selectCategory: {}
+      
+    }
+  },
+  created () {
+    this.getCategorias()
+  },
+  computed: {
+    ...mapState(['userToken'])
+  },
+  methods: {
+
+    ...mapMutations(['modalCreateCategory','modalUpdateCategory']),
+
+    AbrirModalCrearCategory(){
+        this.modalCreateCategory(true)
+    },
+
+    AbrirModalModificarCategory(id){
+        let filterCategory = this.data.find( categ => categ.id === id )
+        this.selectCategory = filterCategory
+        this.modalUpdateCategory(true)
+    },
+
+    showClient(id) {
+      alert(id)
+    },
+
+     deleteCategory(id) {
+      this.$q.dialog({
+        title: 'Confirm',
+        message: '¿Confirma que desea eliminar la categoria seleccionada?',
+        ok: {
+          push: true
+        },
+        cancel: {
+          push: true,
+          color: 'negative'
+        },
+        persistent: true
+      }).onOk(() => {
+        this.$q.loading.show()
+        let API_URI_CATEGORY = 'http://localhost:3000/api/categorias/'+id
+        let config = {
+            headers: { Authorization: `Bearer ${this.userToken}` }
+          }
+        axios.delete(API_URI_CATEGORY, config ).then(response => {
+            this.$q.loading.hide()
+            this.$q.notify({
+              type: 'positive',
+              message: `Categoria eliminada.`
+            })
+            this.getCategorias()
+        }).catch(err => {
+            this.$q.loading.hide()
+            this.$q.notify({
+              type: 'negative',
+              message: err.response.data.msg
+            })
+          })
+      }).onCancel(() => {
+        // console.log('>>>> Cancel')
+      }).onDismiss(() => {
+        // console.log('I am triggered on both OK and Cancel')
+      })
+    },
+
+     async  getCategorias() {
+      let API_URI_CATEGORY = 'http://localhost:3000/api/categorias'
+      let config = {
+          headers: { Authorization: `Bearer ${this.userToken}` }
+        }
+      await axios.get(API_URI_CATEGORY, config).then(response => {
+          this.data =  response.data
+          //console.log(this.data);
+      }).catch(err => {
+        console.log(err.response.data)
+      })
+
+    }
+
+  }
+}
+</script>
